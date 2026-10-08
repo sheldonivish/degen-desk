@@ -1,0 +1,4 @@
+# Degen Desk: X lists to track for the hourly trenches report.
+# Copy this file to lists.txt (install.sh does it for you) and put one X list ID per line.
+# The list ID is the number at the end of a list URL: https://x.com/i/lists/<LIST_ID>
+# Lines starting with # are ignored. Lists must be public (or owned by the connected X account).
