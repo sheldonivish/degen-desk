@@ -141,8 +141,21 @@ fi
 added=0; kept=0
 for d in "$WORK/stage"/*/; do
   name="$(basename "$d")"
-  if [ -e "$SKILLS_DIR/$name" ]; then kept=$((kept+1)); continue; fi
-  cp -R "$d" "$SKILLS_DIR/.$name.partial" && mv "$SKILLS_DIR/.$name.partial" "$SKILLS_DIR/$name"
+  replace=0
+  if [ -e "$SKILLS_DIR/$name" ]; then
+    # the bot template ships a small starter skill map (marked degen-desk-skill-map:starter): swap in the full map
+    if [ "$name" = "degen-desk-skill-map" ] && grep -q 'degen-desk-skill-map:starter' "$SKILLS_DIR/$name/SKILL.md" 2>/dev/null; then
+      replace=1
+    else
+      kept=$((kept+1)); continue
+    fi
+  fi
+  rm -rf -- "${SKILLS_DIR:?}/.$name.partial"
+  cp -R "$d" "$SKILLS_DIR/.$name.partial" || die "copy of $name failed"
+  if [ "$replace" = 1 ]; then
+    rm -rf -- "${SKILLS_DIR:?}/$name"; say "replaced the template's starter skill map with the full map"
+  fi
+  mv "$SKILLS_DIR/.$name.partial" "$SKILLS_DIR/$name"
   added=$((added+1))
 done
 
