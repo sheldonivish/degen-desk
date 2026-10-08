@@ -17,6 +17,9 @@ Transform (same as the reference Degen Desk install):
   3. old skill names / relative links rewritten to the installed clawd-<name> skills.
   4. "Missing upstream pieces" notes + clawd-master not-shipped substitute map.
   5. clawd-pay free-first note.
+The output is the flat clawd-<slug> layout; install-skills.sh then runs clawd/consolidate.py
+(clawd/categories.tsv) to group it into 17 clawd-<category> router skills with the originals
+under clawd-<category>/skills/<slug>/SKILL.reference.md.
 """
 import os, re, sys, json, shutil, argparse, glob, collections
 try:
