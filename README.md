@@ -24,11 +24,27 @@ Then add the X lists you want to track to `lists.txt`, one list ID per line (the
 
 Optional: report times default to Asia/Dubai. Set `DD_TZ` (for example `export DD_TZ=Asia/Kolkata`) and optionally `DD_TZ_LABEL` (for example `IST`) to change the timezone and the label printed after every time.
 
+## Optional: the clawd skill pack (all of clawd's skills)
+
+Degen Desk can also carry the full Musebook "Clawd" Solana skill pack: 203 skills plus the `clawd-master` guide (perps, swaps, launches, prediction markets, wallets, x402, Solana dev, media and more), and `degen-desk-skill-map`, the router that tells the bot which skill fits a job and what it needs to run.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/install-skills.sh | bash
+```
+
+- **Nothing from Musebook is stored in this repo.** The installer downloads the public bundle from `https://musebook.trade/clawd-skills.tar.gz` (v3.14.0, sha256 pinned), the master guide from `https://musebook.trade/SKILL.md`, and the two plugin manifests from `github.com/Solizardking/clawd-plugin` (pinned commit). It then adapts them on your machine with `clawd/build_pack.py`.
+- **What the adaptation adds:** `clawd-<slug>` names, a "Use when ..." description, a "Running here (Degen Desk)" note (paths, keyless `fetch.py` substitutes, the secure secret form for keys), the money-moving guardrails block on the 58 skills that can trade, swap, launch, pay or sign (flags in `clawd/pack.tsv`), old skill names and links rewritten to `clawd-<name>`, and "Missing upstream pieces" notes where the bundle points to files it doesn't ship.
+- Installs into `/home/box/agent-data/workflows/clawd-<slug>/`. Set `SKILLS_DIR=/some/dir` to change this, for example to test into a temp folder. It **never overwrites** an existing skill folder, so it is safe to re-run. Delete a folder first if you want to reinstall it. It finishes by checking every skill's frontmatter (name matches folder) and prints the count and `OK`.
+- If Musebook publishes a new bundle, the pinned checksum stops the install. Re-run with `CLAWD_ALLOW_UPSTREAM_CHANGE=1` to accept it.
+- **Research first.** The pack is guidance and tooling. Every money-moving clawd skill runs only through `memecoin-trading-guardrails`: your own wallet (Phantom or Coinbase), and explicit approval of each trade's exact terms. Many skills also need an API key, a CLI or a Mac. `degen-desk-skill-map` lists what each one needs.
+- The clawd skills keep their upstream authors' licenses. Several ship their own MIT or Apache-2.0 `LICENSE` file, and the plugin repo is MIT.
+
 ## Files
 
 - `fetch.py`: the whole data pipeline. Python 3 standard library only: no installs, no keys, no wallet.
 - `telegram/tg.py`: Telegram delivery (Markdown to Telegram HTML, splitting, safe sending). `telegram/test_tg.py`: offline tests. `telegram/SKILL.md`: the bot's Telegram run book.
 - `lists.example.txt`: template for `lists.txt` (your X list IDs).
+- `install-skills.sh`, `clawd/build_pack.py`, `clawd/pack.tsv`: the clawd pack installer, adapter and money-moving flags. `skills/degen-desk-skill-map/SKILL.md`: the skill router it installs.
 - Created on your machine and never committed: `calls.jsonl` (running call log, one row per post + CA), `dex_cache.json` (last good DexScreener lookup per CA, used only when DexScreener rate-limits), `runs/` (inputs and outputs of every run), `lists.txt`, `telegram/config.json`.
 
 ## Each hourly run
