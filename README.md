@@ -153,3 +153,20 @@ Full run book: `telegram/SKILL.md`.
 Degen Desk is a research tool. Memecoins are extremely risky and most go to zero. Nothing it outputs is a recommendation to buy or sell anything, and third-party data can be wrong, late or manipulated. Do your own research. **Not financial advice.**
 
 License: MIT, (c) 2026 BeingInvested.
+
+## Lighter perps (optional, gated)
+
+`lighter.py` adds Lighter (lighter.xyz) perps. Reads are keyless; trading is dry-run by default and needs an approval code tied to an exact preview.
+
+- **Needs:** the official Lighter agent kit for the SDK: `git clone --depth 1 https://github.com/elliottech/lighter-agent-kit ~/.agents/skills/lighter-agent-kit && python3 ~/.agents/skills/lighter-agent-kit/scripts/bootstrap.py`. This installs code only. Skip the kit's credential step.
+- **Reads:** `python3 lighter.py markets | book SOL | funding SOL | stats SOL | positions --index N | size SOL --side long --equity 1000 --entry 108.3 --stop 107.2`
+- **Paper:** `python3 lighter.py paper init --collateral 1000`, then `place --approve CODE --paper`.
+- **Trading:**
+  1. `preview open SOL --side long --stop 107.2 [--tp 110]` shows the exact terms and a 5-minute code. A reduce-only stop is required and risk is hard-capped at 1% of equity.
+  2. The owner says yes to those terms.
+  3. `place --approve CODE --live` sends once, never retries, and reads the account back.
+  4. `close` and `cancel` work the same way.
+- **Hard-blocked:** withdraw, transfer, account mode and collateral changes.
+- **Keys:** env vars only. `LIGHTER_API_PRIVATE_KEY` (a scoped API key from a dedicated sub-account, slot 4–254, made at app.lighter.xyz/apikeys) goes in through your platform's secret store, plus `LIGHTER_ACCOUNT_INDEX` and `LIGHTER_API_KEY_INDEX`. Lighter has no trade-only key: an API key can also make secure withdrawals to the owner's own wallet, so keep only trading money in that sub-account. Never share a seed phrase or wallet private key.
+- **Location:** check Lighter's terms (https://lighter.xyz/terms). The US, Canada, UK and others are restricted.
+- Referral link (the author's; disclosed): https://app.lighter.xyz/?ref=SHELDON. Not financial advice.
