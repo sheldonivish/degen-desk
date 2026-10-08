@@ -24,12 +24,19 @@ Gated trading (risk hard-capped at 1% of equity per trade):
   lighter.py place --approve CODE              # dry-run: shows exactly what would be sent
   lighter.py place --approve CODE --paper      # fill the entry on the local paper account
   lighter.py place --approve CODE --live       # sign + send ONCE, then confirm via account read
+  lighter.py keycheck --live                   # uses the key to confirm it matches account + slot; sends nothing
+
+Where it runs: Lighter rejects sends from restricted jurisdictions (code 20558), which includes many
+cloud hosts. Live trading runs on the owner's own computer (where Lighter's terms allow it) as
+~/.degen-desk/desk_lighter.py via the ~/.degen-desk/lt runner (see lighter/install-local.sh). Never use a
+VPN or proxy to get around it. Don't name this file lighter.py next to the SDK: it shadows `import lighter`.
 
 Hard-blocked (never implemented): withdraw, transfer, mode, collateral, fast-withdraw,
 change-api-key, sub-account. Do those in the Lighter app.
 
 Env: LIGHTER_API_PRIVATE_KEY (secret, only needed for --live), LIGHTER_ACCOUNT_INDEX,
 LIGHTER_API_KEY_INDEX (4-254), optional LIGHTER_HOST. The kit's credentials file is never read.
+The lt runner loads the key (macOS Keychain, or the owner's own shell profile) only for --live.
 The API private key is never printed or logged; the log holds order ids and tx hashes only.
 """
 import argparse, asyncio, hashlib, json, math, os, secrets, subprocess, sys, time, urllib.parse, urllib.request
@@ -320,7 +327,9 @@ def live_creds():
     acct, kidx = os.environ.get("LIGHTER_ACCOUNT_INDEX", "").strip(), os.environ.get("LIGHTER_API_KEY_INDEX", "").strip()
     missing = [n for n, v in (("LIGHTER_API_PRIVATE_KEY", key), ("LIGHTER_ACCOUNT_INDEX", acct), ("LIGHTER_API_KEY_INDEX", kidx)) if not v]
     if missing: fail("live trading not configured; nothing sent", missing=missing,
-                     how="add them through a secure secret request (never in chat, files, or the kit's credentials file)")
+                     how="on the owner's computer run via ~/.degen-desk/lt: it sets the indexes and, with --live, loads the key "
+                         "from the macOS Keychain (service degen-desk-lighter) or the owner's own shell profile. Never in chat, "
+                         "repo files, or the kit's credentials file")
     if not acct.isdigit() or not kidx.isdigit() or not 4 <= int(kidx) <= 254:
         fail("LIGHTER_ACCOUNT_INDEX must be an integer and LIGHTER_API_KEY_INDEX must be 4-254")
     return key, int(acct), int(kidx)
@@ -382,6 +391,37 @@ async def send_live(rec, key, acct, kidx):
             if client is not None: await client.close()
         except Exception: pass
 
+GEO_HINT = ("Lighter blocked this computer's location (restricted jurisdiction, code 20558). Run trades on the owner's "
+            "own computer, only where https://lighter.xyz/terms allows; never via VPN or proxy. Preview again there.")
+
+def geo_blocked(detail):
+    d = str(detail or "").lower()
+    return "20558" in d or "restricted jurisdiction" in d
+
+async def key_check(key, acct, kidx):
+    lighter, _ = load_sdk(); client = None
+    try:
+        client = lighter.SignerClient(url=HOST, account_index=acct, api_private_keys={kidx: key})
+        err = client.check_client()
+        if err: return {"ok": False, "error": "key does not match this account/slot (revoked, wrong slot or wrong account?)",
+                        "detail": redact(err)[:200]}
+        return {"ok": True}
+    except Exception as ex:
+        return {"ok": False, "error": "key check failed", "detail": redact(f"{type(ex).__name__}: {ex}")[:200]}
+    finally:
+        try:
+            if client is not None: await client.close()
+        except Exception: pass
+
+def cmd_keycheck(a):
+    if not a.live: fail("keycheck reads the API key, so it needs --live (run it through ~/.degen-desk/lt); nothing is sent")
+    key, acct, kidx = live_creds()
+    r = asyncio.run(key_check(key, acct, kidx)); del key
+    if not r["ok"]:
+        if geo_blocked(r.get("detail")): r["hint"] = GEO_HINT
+        out({"status": "KEY CHECK FAILED", "account_index": acct, "api_key_index": kidx, **r}, 1)
+    out({"status": "KEY OK - matches account and slot; nothing sent", "account_index": acct, "api_key_index": kidx})
+
 def confirm(rec, acct):
     time.sleep(3)
     a = account(acct); mid = rec["terms"]["market_id"]
@@ -414,7 +454,9 @@ def cmd_place(a):
     res = asyncio.run(send_live(rec, key, acct, kidx)); del key
     log({**base, "mode": "live", "tx_hash": ",".join(h for h in res.get("tx_hashes", []) if h) or None,
          "status": res.get("status", "error")})
-    if "error" in res: out({"status": "NOT PLACED", **res, "terms": rec["terms"]}, 1)
+    if "error" in res:
+        if geo_blocked(res.get("detail")): res["hint"] = GEO_HINT
+        out({"status": "NOT PLACED", **res, "terms": rec["terms"]}, 1)
     out({"status": "SENT ONCE", "terms": rec["terms"], "client_order_ids": ids, "tx_hashes": res["tx_hashes"], **confirm(rec, acct)})
 
 # ---------------------------------------------------------------- cli
@@ -450,10 +492,12 @@ def main():
     for sp in (o, c, x): sp.add_argument("--ttl", type=int, default=DEFAULT_TTL)
     pl = s.add_parser("place"); pl.add_argument("--approve", required=True)
     pl.add_argument("--live", action="store_true"); pl.add_argument("--paper", action="store_true")
+    s.add_parser("keycheck").add_argument("--live", action="store_true")
     a = p.parse_args()
     if a.cmd == "size": return cmd_size(a)
     if a.cmd == "preview": return cmd_preview(a)
     if a.cmd == "place": return cmd_place(a)
+    if a.cmd == "keycheck": return cmd_keycheck(a)
     return cmd_reads(a)
 
 if __name__ == "__main__":

@@ -100,6 +100,10 @@ Router: `/home/box/agent-data/workflows/clawd-perps-vulcan/SKILL.md` · sub-skil
 - vulcan-trade-execution: market/limit orders; wallet, cli: vulcan
 - vulcan-twap-execution: TWAP runner; wallet, cli: vulcan
 
+## lighter-perps: Lighter perp DEX (Degen Desk skill, 1)
+Skill: `lighter-perps` · box script (reads, previews, paper): `/workspace/trenches/lighter.py` · owner's computer (live): `~/.degen-desk/lt` + `~/.degen-desk/desk_lighter.py`, set up with `lighter/install-local.sh` from the degen-desk repo · official kit: `~/.agents/skills/lighter-agent-kit`
+- lighter-perps: reads (markets, book, funding, stats, positions), 1%-risk sizing and paper mode are `ready` anywhere; live trading runs only on the owner's own computer via machine-targeted Shell (Lighter blocks this box: restricted jurisdiction, code 20558; never a VPN or proxy): preview, exact-terms yes, then `lt place --approve CODE --live` once; key: owner's macOS Keychain item `degen-desk-lighter` (or `LIGHTER_API_PRIVATE_KEY` in their own shell profile on Linux/WSL), read by `lt` only for `--live`; gated by `memecoin-trading-guardrails` (Lighter section); withdraw/transfer hard-blocked => prefer this over Imperial/Vulcan when the owner says Lighter
+
 ## clawd-prediction-markets: prediction markets (DFlow / Kalshi) (5)
 Router: `/home/box/agent-data/workflows/clawd-prediction-markets/SKILL.md` · sub-skills: `/home/box/agent-data/workflows/clawd-prediction-markets/skills/<slug>/SKILL.reference.md`
 - dflow-docs: DFlow docs/API index; ready
@@ -270,6 +274,7 @@ Router: `/home/box/agent-data/workflows/clawd-messaging/SKILL.md` · sub-skills:
 ## Owner setup unlocks
 - Phantom plugin (704) or Coinbase connector (68516158): the 58 `wallet` skills, always gated by `memecoin-trading-guardrails`. Solana flows sign in Phantom; EVM/Robinhood Chain/Uniswap flows need an EVM wallet the owner controls. Some also need a key or CLI.
 - Keys: `DFLOW_API_KEY` 6 (DFlow spot, Kalshi data/scanner/portfolio/trading, platform fees); `IMPERIAL_API_KEY` 2 (Imperial entry + portfolio (wallet-signed JWT)); `UNISWAP_API_KEY` 3 (Uniswap swap/LP APIs, OKX 402 pay); `CHESHIRE_API_KEY` 2 (Cheshire API, agent forge); `OPENAI_API_KEY` 3 (image gen, Whisper API, oracle); `OPENROUTER_API_KEY` 2 (images, agent TUI); `GOOGLE_PLACES_API_KEY` 2 (places lookups); `CLOUDFLARE_API_TOKEN` 2 (wrangler, email service); one each: `HELIUS_API_KEY`, `HELIUS_RPC_URL` + `TELEGRAM_BOT_TOKEN` (swarm), `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`, `NOTION_KEY`, `TRELLO_API_KEY` + `TRELLO_TOKEN`, `STRIPE_SECRET_KEY`, `SPONGE_API_KEY`, `POSTHOG_API_KEY`, Discord and Slack bot tokens; LLM vendor keys for coding-agent, clawdex, summarize, gemini, solana-clawd.
+- Lighter: the owner creates a sub-account + API key (slot 4–254) at app.lighter.xyz/apikeys, runs `lighter/install-local.sh` on their own computer, and stores the key themselves (macOS Keychain or their shell profile); never in chat or on this box. Reads and paper work without it. See `lighter-perps`.
 - Vulcan CLI (Ellipsis-Labs GitHub install script, see `clawd-master`): 14 Phoenix perps skills; market data is keyless once installed, trading also needs a wallet.
 - Other CLIs: 44 skills, each named on its line. Most install with npm, pip/uv or `go install` (node, uv and go are present); brew-only taps need a Linux build; SolanaOS core is unavailable. Ask before installing.
 - Mac-only, cannot run here: 9 (apple-notes, apple-reminders, bear-notes, things-mac, peekaboo, agent-desktop, model-usage, imsg, bluebubbles).

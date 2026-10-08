@@ -48,6 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/instal
 - `telegram/tg.py`: Telegram delivery (Markdown to Telegram HTML, splitting, safe sending). `telegram/test_tg.py`: offline tests. `telegram/SKILL.md`: the bot's Telegram run book.
 - `lists.example.txt`: template for `lists.txt` (your X list IDs).
 - `install-skills.sh`, `clawd/build_pack.py`, `clawd/pack.tsv`: the clawd pack installer, adapter and money-moving flags. `clawd/consolidate.py`, `clawd/categories.tsv`: groups the pack into the 17 category router skills (category, purpose, needs and money flag per sub-skill). `skills/degen-desk-skill-map/SKILL.md`: the skill router it installs.
+- `lighter.py`: Lighter perps (keyless reads, paper, gated orders). `lighter/install-local.sh` and `lighter/lt`: set it up for live trading on your own computer. `skills/lighter-perps/SKILL.md`: the bot's Lighter run book. See [Lighter perps](#lighter-perps-optional-gated).
 - Created on your machine and never committed: `calls.jsonl` (running call log, one row per post + CA), `dex_cache.json` (last good DexScreener lookup per CA, used only when DexScreener rate-limits), `runs/` (inputs and outputs of every run), `lists.txt`, `telegram/config.json`.
 
 ## Each hourly run
@@ -156,17 +157,34 @@ License: MIT, (c) 2026 BeingInvested.
 
 ## Lighter perps (optional, gated)
 
-`lighter.py` adds Lighter (lighter.xyz) perps. Reads are keyless; trading is dry-run by default and needs an approval code tied to an exact preview.
+`lighter.py` adds Lighter (lighter.xyz) perps: keyless reads, 1%-risk sizing, paper trading, and gated live orders (preview the exact terms, approve, send once). Risk is hard-capped at 1% of equity per trade, every entry carries a reduce-only stop, and withdraw, transfer, account mode, collateral and close-all are hard-blocked. Skill: [`skills/lighter-perps/SKILL.md`](skills/lighter-perps/SKILL.md).
 
-- **Needs:** the official Lighter agent kit for the SDK: `git clone --depth 1 https://github.com/elliottech/lighter-agent-kit ~/.agents/skills/lighter-agent-kit && python3 ~/.agents/skills/lighter-agent-kit/scripts/bootstrap.py`. This installs code only. Skip the kit's credential step.
-- **Reads:** `python3 lighter.py markets | book SOL | funding SOL | stats SOL | positions --index N | size SOL --side long --equity 1000 --entry 108.3 --stop 107.2`
-- **Paper:** `python3 lighter.py paper init --collateral 1000`, then `place --approve CODE --paper`.
-- **Trading:**
-  1. `preview open SOL --side long --stop 107.2 [--tp 110]` shows the exact terms and a 5-minute code. A reduce-only stop is required and risk is hard-capped at 1% of equity.
-  2. The owner says yes to those terms.
-  3. `place --approve CODE --live` sends once, never retries, and reads the account back.
-  4. `close` and `cancel` work the same way.
-- **Hard-blocked:** withdraw, transfer, account mode and collateral changes.
-- **Keys:** env vars only. `LIGHTER_API_PRIVATE_KEY` (a scoped API key from a dedicated sub-account, slot 4–254, made at app.lighter.xyz/apikeys) goes in through your platform's secret store, plus `LIGHTER_ACCOUNT_INDEX` and `LIGHTER_API_KEY_INDEX`. Lighter has no trade-only key: an API key can also make secure withdrawals to the owner's own wallet, so keep only trading money in that sub-account. Never share a seed phrase or wallet private key.
-- **Location:** check Lighter's terms (https://lighter.xyz/terms). The US, Canada, UK and others are restricted.
-- Referral link (the author's; disclosed): https://app.lighter.xyz/?ref=SHELDON. Not financial advice.
+**Where it runs.** Lighter rejects orders from restricted jurisdictions (`restricted jurisdiction`, code 20558), and that includes many cloud servers, so a bot's cloud box can read and paper-trade but can't place orders. Live trading runs on **your own computer**, and only if Lighter's terms allow your location (https://lighter.xyz/terms: the US, Canada, UK and others are restricted). Don't use a VPN or proxy to get around it.
+
+**Set up your computer (macOS, Linux, or Windows via WSL):**
+
+1. In Lighter, make a sub-account that holds only your trading money, switch to it, and create an API key in slot 4–254 at https://app.lighter.xyz/apikeys. Note the account index and slot (they aren't secret). Lighter has no trade-only key: an API key can also make secure withdrawals to your own wallet, so keep only trading money in that sub-account.
+2. Install (no key involved):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/lighter/install-local.sh | bash -s -- --account <INDEX> --slot <SLOT>
+   ```
+   It installs Lighter's official agent kit (code only; its key prompt is skipped) to `~/.agents/skills/lighter-agent-kit`, puts the script at `~/.degen-desk/desk_lighter.py` (not `lighter.py`, which would shadow the SDK) with the `~/.degen-desk/lt` runner, and runs a keyless read. It never takes a key.
+3. Store the API private key yourself:
+   - macOS Keychain: `security add-generic-password -U -a lighter -s degen-desk-lighter -w` (paste the key twice; nothing shows).
+   - Linux/WSL: add `export LIGHTER_API_PRIVATE_KEY=...` to your own `~/.bashrc` or `~/.zshrc` in an editor, then `chmod 600` it.
+   `lt` loads the key only for commands with `--live`. Never paste it in chat, and never share a seed phrase or wallet private key.
+4. Check it (sends nothing): `~/.degen-desk/lt keycheck --live`.
+
+**Use it** (your bot can run these on your computer, with your approval of each command):
+
+- Reads: `lt markets --search SOL | book SOL | funding SOL | stats SOL | positions | account --index N`
+- Paper: `lt paper init --collateral 1000`, then `lt place --approve CODE --paper`
+- Trade:
+  1. `lt preview open SOL --side long --stop 107.2 [--tp 110]` shows the exact terms and a 5-minute code.
+  2. You say yes to those exact terms.
+  3. `lt place --approve CODE --live` sends once, never retries, and reads the account back.
+  4. `preview close` and `preview cancel` work the same way.
+
+On a cloud box, `python3 lighter.py ...` does the same reads, previews and paper trades without a key.
+
+Referral link (the template author's; disclosed): https://app.lighter.xyz/?ref=SHELDON. Not financial advice.

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Degen Desk x Lighter runner for the OWNER'S OWN computer.
+#   ~/.degen-desk/lt markets --search BTC
+#   ~/.degen-desk/lt preview open BTC --side long --stop 80900
+#   ~/.degen-desk/lt place --approve CODE           # dry-run
+#   ~/.degen-desk/lt place --approve CODE --live    # sends once (owner approved the exact terms)
+#   ~/.degen-desk/lt keycheck --live                # checks the key matches account + slot; sends nothing
+#
+# Sets the account index and API key slot (not secret), then runs desk_lighter.py from this folder.
+# The API private key is loaded ONLY when --live is passed:
+#   macOS: from the login Keychain (service degen-desk-lighter, account lighter). Add it once yourself in Terminal:
+#            security add-generic-password -U -a lighter -s degen-desk-lighter -w
+#   Linux / WSL: from LIGHTER_API_PRIVATE_KEY that you export in your own shell profile.
+# The key is never an argument, never printed and never written to a file by this script.
+set -euo pipefail
+
+ACCOUNT_INDEX="__ACCOUNT_INDEX__"     # your Lighter (sub-)account index
+API_KEY_INDEX="__API_KEY_INDEX__"     # the API key slot you created (4-254)
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="$DIR/desk_lighter.py"
+[ -f "$SCRIPT" ] || { echo '{"error": "desk_lighter.py not found next to lt; re-run lighter/install-local.sh"}'; exit 1; }
+if [ -f "$DIR/lighter.py" ]; then
+  echo '{"error": "a file named lighter.py in '"$DIR"' shadows the Lighter SDK; rename or remove it"}'; exit 1
+fi
+
+case "$ACCOUNT_INDEX" in __*|"") unset LIGHTER_ACCOUNT_INDEX ;; *) export LIGHTER_ACCOUNT_INDEX="$ACCOUNT_INDEX" ;; esac
+case "$API_KEY_INDEX" in __*|"") unset LIGHTER_API_KEY_INDEX ;; *) export LIGHTER_API_KEY_INDEX="$API_KEY_INDEX" ;; esac
+
+live=0
+for a in "$@"; do [ "$a" = "--live" ] && live=1; done
+
+if [ "$live" = 1 ]; then
+  if [ "$(uname -s)" = "Darwin" ] && command -v security >/dev/null 2>&1; then
+    if k="$(security find-generic-password -s degen-desk-lighter -a lighter -w 2>/dev/null)" && [ -n "$k" ]; then
+      export LIGHTER_API_PRIVATE_KEY="$k"; unset k
+    elif [ -z "${LIGHTER_API_PRIVATE_KEY:-}" ]; then
+      echo '{"error": "no Lighter key in the macOS Keychain; nothing sent", "how": "in your own Terminal run: security add-generic-password -U -a lighter -s degen-desk-lighter -w (paste the API private key when asked)"}'
+      exit 2
+    fi
+  elif [ -z "${LIGHTER_API_PRIVATE_KEY:-}" ]; then
+    # non-interactive shells may not read the profile, so try the usual ones (owner-created, never written by Degen Desk)
+    # read only the export line, so nothing else in the profile runs
+    for f in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
+      [ -f "$f" ] || continue
+      line="$(grep -E '^[[:space:]]*export[[:space:]]+LIGHTER_API_PRIVATE_KEY=' "$f" 2>/dev/null | tail -n 1 || true)"
+      if [ -n "$line" ]; then
+        LIGHTER_API_PRIVATE_KEY="$(env -u BASH_ENV -u ENV bash --noprofile --norc -c "$line"' >/dev/null 2>&1; printf %s "${LIGHTER_API_PRIVATE_KEY:-}"' </dev/null)"
+        unset line; [ -n "$LIGHTER_API_PRIVATE_KEY" ] && break
+      fi
+    done
+    if [ -z "${LIGHTER_API_PRIVATE_KEY:-}" ]; then
+      echo '{"error": "LIGHTER_API_PRIVATE_KEY is not set; nothing sent", "how": "add export LIGHTER_API_PRIVATE_KEY=... to your own shell profile yourself (chmod 600), never in chat"}'
+      exit 2
+    fi
+    export LIGHTER_API_PRIVATE_KEY
+  fi
+else
+  unset LIGHTER_API_PRIVATE_KEY LIGHTER_ETH_PRIVATE_KEY   # reads, previews and dry-runs never see the key
+fi
+
+exec python3 "$SCRIPT" "$@"

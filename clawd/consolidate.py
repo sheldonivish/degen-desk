@@ -288,6 +288,12 @@ def skill_map(base, rows, final, out):
             if r['first']: line += f" => {r['first']}"
             L.append(line)
         L.append('')
+    # keep Degen Desk's own (non-clawd) sections from the base map, e.g. "## lighter-perps: ..."
+    cat_names = {c for c, _, _ in CATS}
+    for sec in t.split('\n## ')[1:]:
+        head = sec.split('\n', 1)[0]; name = head.split(':', 1)[0].strip()
+        if name in cat_names or name.startswith('clawd') or head.startswith('Owner setup unlocks'): continue
+        L.append('## ' + sec.rstrip('\n')); L.append('')
     L.append(owner.rstrip('\n'))
     open(out, 'w', encoding='utf-8').write('\n'.join(L) + '\n')
 
