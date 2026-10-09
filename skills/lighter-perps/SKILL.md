@@ -49,6 +49,14 @@ Lighter rejects sends from restricted jurisdictions, and that includes this bot'
 - **Hard-blocked:** withdraw, transfer, account mode, collateral, fast-withdraw, change-api-key, sub-accounts and close-all. Don't use the kit's `trade.py` (it signs with no preview); point the owner to the Lighter app.
 - Logs (`~/.degen-desk/lighter/orders.log`) hold only order ids and tx hashes.
 
+## 6. BTC autopilot (optional, owner's Mac only)
+An unattended BTC bot, `autopilot/` in the Degen Desk repo (guide: `autopilot/README.md`). It runs multi-timeframe SMC setups (A, G, RIMC on 4h/15m/3m) as a launchd agent on the owner's Mac and sends one grouped order per signal: entry + reduce-only stop + TP. Backtest: BTC only, OOS 38 trades, PF ~2.7; ETH failed; about 1–2 trades a week, not scalping. Say this plainly; never promise returns.
+- Needs sections 1.1–1.4 done first (it reads the account index and slot from `~/.degen-desk/lt`, the key from the Keychain only in live mode).
+- Install (dry-run, sends nothing): `curl -fsSL https://github.com/sheldonivish/degen-desk/archive/refs/heads/main.tar.gz | tar xz -C /tmp && bash /tmp/degen-desk-main/autopilot/install.sh`. Live only when the owner explicitly asks for live autopilot after seeing the risks: `bash /tmp/degen-desk-main/autopilot/install.sh --live`.
+- Guardrails: 1% risk/trade by default (hard ceiling 2%), 3x leverage cap, one position, -4% daily stop, -15% drawdown pause, 24h max hold.
+- Check: `~/.degen-desk/autopilot/venv/bin/python3 ~/.degen-desk/autopilot/autopilot.py status`. Stop (kill switch, closes the BTC position): `... autopilot.py stop`; `pause` / `resume`; remove: `bash ~/.degen-desk/autopilot/uninstall.sh`.
+- Turning the autopilot on is the owner's standing approval for its own trades within these limits; it never replaces the preview → approve flow for manual orders. Never raise risk above the ceiling or disable a guardrail on request without restating the risk and getting an explicit yes.
+
 ## 5. Risks (say them plainly)
 - **No trade-only key exists.** A Lighter API key can trade, cancel, change leverage and margin, move funds between the owner's own accounts and make secure withdrawals (to the owner's own wallet only). Anyone with the key could trade the account to zero, so keep only trading money in that sub-account.
 - Orders are final, leverage can liquidate, and stops can slip or gap in fast markets.

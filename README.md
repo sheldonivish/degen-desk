@@ -7,8 +7,9 @@ Free, keyless memecoin trenches research tools. Degen Desk is the data side of a
 - **Boost and launch scans**: DexScreener boosts and Musebook feeds, filtered and cross-checked against what your tracked accounts called; newest pump.fun launches.
 - **Read-only market modes**: Jupiter quote with buy + sell-back round-trip loss, Raydium pools, Backpack markets and funding, tokenized stocks / RWA, Kalshi and Jupiter prediction markets, ORE mining, Metaplex agents.
 - **Telegram delivery**: posts the report to one approved Telegram group, channel, topic or DM through your own bot, with clean formatting and safe splitting.
+- **Optional Lighter perps** (`lighter.py`) and a **BTC autopilot for Lighter** (`autopilot/`) that run only on your own computer, with your own key, dry-run by default.
 
-**Research only.** Nothing here builds, signs or sends a transaction, order or payment. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
+**Research first.** The report and research tools never build, sign or send a transaction, order or payment. The only parts that can place orders are the optional Lighter tools (`lighter.py` and `autopilot/`), and only on your own computer with an API key you store yourself; both default to dry-run. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
 
 ## Install
 
@@ -48,6 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/instal
 - `telegram/tg.py`: Telegram delivery (Markdown to Telegram HTML, splitting, safe sending). `telegram/test_tg.py`: offline tests. `telegram/SKILL.md`: the bot's Telegram run book.
 - `lists.example.txt`: template for `lists.txt` (your X list IDs).
 - `install-skills.sh`, `clawd/build_pack.py`, `clawd/pack.tsv`: the clawd pack installer, adapter and money-moving flags. `clawd/consolidate.py`, `clawd/categories.tsv`: groups the pack into the 17 category router skills (category, purpose, needs and money flag per sub-skill). `skills/degen-desk-skill-map/SKILL.md`: the skill router it installs.
+- `autopilot/`: the optional BTC autopilot for Lighter (macOS launchd agent, dry-run by default). See [BTC autopilot](#btc-autopilot-for-lighter-optional-runs-on-your-mac) and [`autopilot/README.md`](autopilot/README.md).
 - `lighter.py`: Lighter perps (keyless reads, paper, gated orders). `lighter/install-local.sh` and `lighter/lt`: set it up for live trading on your own computer. `skills/lighter-perps/SKILL.md`: the bot's Lighter run book. See [Lighter perps](#lighter-perps-optional-gated).
 - Created on your machine and never committed: `calls.jsonl` (running call log, one row per post + CA), `dex_cache.json` (last good DexScreener lookup per CA, used only when DexScreener rate-limits), `runs/` (inputs and outputs of every run), `lists.txt`, `telegram/config.json`.
 
@@ -188,3 +190,20 @@ License: MIT, (c) 2026 BeingInvested.
 On a cloud box, `python3 lighter.py ...` does the same reads, previews and paper trades without a key.
 
 Referral link (the template author's; disclosed): https://app.lighter.xyz/?ref=SHELDON. Not financial advice.
+
+## BTC autopilot for Lighter (optional, runs on your Mac)
+
+`autopilot/` is an unattended BTC-perp bot for Lighter built from multi-timeframe smart-money-concepts (SMC) rules from a trading course (setups A, G and RIMC on a 4h / 15m / 3m stack). When a setup fires it sends one grouped order: entry + reduce-only stop + reduce-only take-profit. Full guide, backtest and risks: [`autopilot/README.md`](autopilot/README.md).
+
+- **Honest numbers:** BTC only. Out-of-sample (19 Jun to 7 Oct 2026) at 1% risk: 38 trades, profit factor about 2.7, max drawdown -3.4%. The same rules failed on ETH, 2023 was negative, and 38 trades is a small sample. It is not scalping: expect about 1-2 trades a week, held hours up to a day.
+- **Guardrails:** 1% risk per trade by default (2% hard ceiling), 3x leverage cap, one position, exchange-side stop + TP on every entry, -4% daily loss stop, -15% drawdown pause, kill switch, reconcile on restart. **Dry-run by default**; live needs `install.sh --live`.
+- **Where:** your own Mac, after the Lighter setup above (sub-account, API key in your Keychain, `lighter/install-local.sh`). Lighter blocks cloud servers; never use a VPN or proxy.
+- **Install (dry-run):** `curl -fsSL https://github.com/sheldonivish/degen-desk/archive/refs/heads/main.tar.gz | tar xz -C /tmp && bash /tmp/degen-desk-main/autopilot/install.sh`
+- **Stop:** `~/.degen-desk/autopilot/venv/bin/python3 ~/.degen-desk/autopilot/autopilot.py stop` (cancels BTC orders, closes the BTC position, stays stopped), or `bash ~/.degen-desk/autopilot/uninstall.sh`.
+
+Not financial advice. It can lose money.
+
+## Changelog
+
+- **2026-10-09:** Added `autopilot/`, a BTC autopilot for Lighter (multi-timeframe SMC setups A, G and RIMC, backtested Feb 2022 to Oct 2026) with 1% default risk, 3x leverage cap, exchange-side stop + TP on every entry, daily stop, drawdown pause, kill switch and a one-command macOS installer (dry-run by default). Fixes in the autopilot's Lighter client: the signer client is created inside an event loop, the active-orders read passes auth correctly, and the installer no longer runs a key check. `skills/lighter-perps` gained an autopilot section.
+- **2026-10-08 to 09:** Lighter perps (`lighter.py`, `lighter/install-local.sh`, `lt` runner, `skills/lighter-perps`), template v3 support, clawd pack as 17 category skills.
