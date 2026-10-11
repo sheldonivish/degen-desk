@@ -1,0 +1,41 @@
+{
+  "rest": "https://api.rh.lighter.xyz",
+  "ws": "wss://api.rh.lighter.xyz/stream",
+  "chain_id": 4663,
+  "account_index": null,
+  "api_key_index": null,
+  "keychain_service": "lighter-rh",
+  "keychain_account": "api",
+  "markets": {
+    "1": {
+      "symbol": "BTC",
+      "order_usd": 50,
+      "max_pos_usd": 200
+    },
+    "26": {
+      "symbol": "SPY",
+      "order_usd": 50,
+      "max_pos_usd": 200
+    }
+  },
+  "equity_usd": 1000,
+  "total_exposure_usd": 400,
+  "max_leverage": 2,
+  "min_order_usd": 10,
+  "fee_bps": 1.2,
+  "buffer_bps": 0.5,
+  "vol_k": 1.5,
+  "vol_window_s": 60,
+  "skew_bps_at_max": 3.0,
+  "requote_bps": 0.5,
+  "daily_loss_pct": 2.0,
+  "stale_s": 3.0,
+  "max_rejects": 3,
+  "stop_file": "STOP",
+  "poll_s": 1.0,
+  "markout_s": [
+    1,
+    5,
+    30
+  ]
+}

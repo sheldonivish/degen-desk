@@ -14,47 +14,9 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).parent))
 import tg  # noqa: E402
 
-HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent
-FIXTURES = Path(tempfile.mkdtemp(prefix="tg_fixtures_"))
-
-
-def _sample_report():
-    """Synthetic report in the Degen Desk format (fake handles, fake post ids, illustrative numbers)."""
-    L = ["# Memecoin trenches report, 8:16 PM", "",
-         "**TL;DR:** chop on majors, one convergence call on [@trader_one](https://x.com/trader_one) and "
-         "[@_alpha_two](https://x.com/_alpha_two). Concentration flag: none.", "",
-         "## Memecoin trenches sentiment", ""]
-    for i in range(8):
-        L.append(f"- [@caller_{i}](https://x.com/caller_{i}) says rotation into fresh launches is back "
-                 f"([post](https://x.com/caller_{i}/status/19000000000000000{i:02d})). Mood: cautious *risk-on* "
-                 f"with R&D <talk> & `code_{i}` mentions.")
-    L += ["", "## Majors", "", "BTC $100,000 (+1.0%), ETH $4,000 (-0.5%), SOL $200 (+2.0%). Source: "
-          "[Hyperliquid](https://app.hyperliquid.xyz), as of 8:15 PM.", "", "## Calls & CAs", ""]
-    for i in range(10):
-        mint = f"Fake{i}Mint1111111111111111111111111pump"
-        L.append(f"- **$FAKE{i}** [{mint[:4]}…pump](https://pump.fun/coin/{mint}) called by "
-                 f"[@caller_{i}](https://x.com/caller_{i}) ([post](https://x.com/caller_{i}/status/1900000000000000{i:03d})). "
-                 f"MC $1.{i}M, liq $120K, 1h +{i}% [DexScreener, as of 8:15 PM]")
-        L.append(f"  - On curve, {i * 9}% to graduation [Solana RPC, 8:15 PM]")
-        L.append(f"  - Mint authority revoked, freeze authority revoked; top-10 {20 + i}% [RugCheck, 8:15 PM]")
-        evm = "0x" + f"{i:x}" * 40
-        L.append(f"- **$EVM{i}** [{evm[:6]}…](https://dexscreener.com/base/{evm}) on Base, FDV $3{i}0K [DexScreener, as of 8:15 PM]")
-    L += ["", "## Most mentioned (24h)", ""]
-    L += [f"{i + 1}. $FAKE{i}: {9 - i} distinct accounts" for i in range(9)]
-    L += ["", "Not financial advice."]
-    return "\n".join(L)
-
-
-def _sample_blocks():
-    parts = [_sample_report().replace("# Memecoin", f"# Block {k} memecoin") for k in range(3)]
-    return "<!-- window 7:06 PM-8:16 PM · per-list results [25, 12] -->\n" + "\n\n".join(parts)
-
-
-REPORT = FIXTURES / "report.md"
-REPORT.write_text(os.environ.get("TG_TEST_REPORT") and Path(os.environ["TG_TEST_REPORT"]).read_text() or _sample_report())
-BLOCKS = FIXTURES / "blocks.md"
-BLOCKS.write_text(_sample_blocks())
+ROOT = Path("/workspace/trenches")
+REPORT = ROOT / "report-v2.md"
+BLOCKS = sorted(glob.glob(str(ROOT / "runs/blocks_*.md")), key=os.path.getmtime)[-1]
 ANCHOR_RE = re.compile(r'<a href="[^"]*">.*?</a>', re.S)
 
 
@@ -89,8 +51,8 @@ class Converter(unittest.TestCase):
         self.assertEqual(tg.inline("`**not bold** [a](b)`"), "<code>**not bold** [a](b)</code>")
 
     def test_underscore_handles_untouched(self):
-        h = tg.inline("@_handle36 and @trader_ and 5_000")
-        self.assertEqual(h, "@_handle36 and @trader_ and 5_000")
+        h = tg.inline("@_Shadow36 and @mitchiesol_ and 5_000")
+        self.assertEqual(h, "@_Shadow36 and @mitchiesol_ and 5_000")
 
     def test_misnested_emphasis_falls_back(self):
         h = tg.inline("**a *b** c*")
@@ -277,6 +239,26 @@ class Sending(unittest.TestCase):
         code, out, _ = self.run_cli("config", "--chat", "-1001", "--thread", "3", "--enable")
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(self.cfg.read_text()), {"chat_id": -1001, "thread_id": 3, "enabled": True})
+
+
+class FanOutTest(unittest.TestCase):
+    def test_send_goes_to_primary_and_extras(self):
+        import tempfile, io, contextlib
+        from unittest import mock
+        d = Path(tempfile.mkdtemp())
+        cfgp = d / "c.json"; cfgp.write_text(json.dumps({"chat_id": -100, "thread_id": None, "enabled": True,
+                                                         "extra_chat_ids": [-200]}))
+        md = d / "r.md"; md.write_text("hello\n\nNot financial advice.")
+        sent = []
+        def fake(method, params=None, **k):
+            sent.append(params["chat_id"]); return {"message_id": len(sent)}
+        out = io.StringIO()
+        with mock.patch.object(tg, "call_with_retry", fake), mock.patch.object(tg.time, "sleep"), \
+                contextlib.redirect_stdout(out):
+            tg.main(["--config", str(cfgp), "send", "--file", str(md), "--require", "Not financial advice"])
+        self.assertEqual([str(c) for c in sent], ["-100", "-200"])
+        last = json.loads(out.getvalue().strip().splitlines()[-1])
+        self.assertTrue(last["ok"]); self.assertEqual(len(last["results"]), 2)
 
 
 if __name__ == "__main__":

@@ -189,7 +189,7 @@ License: MIT, (c) 2026 BeingInvested.
 
 On a cloud box, `python3 lighter.py ...` does the same reads, previews and paper trades without a key.
 
-Referral link (the template author's; disclosed): https://app.lighter.xyz/?ref=SHELDON. Not financial advice.
+Not financial advice.
 
 ## BTC autopilot for Lighter (optional, runs on your Mac)
 
@@ -203,7 +203,43 @@ Referral link (the template author's; disclosed): https://app.lighter.xyz/?ref=S
 
 Not financial advice. It can lose money.
 
+## Trenches picks (v4 short format)
+
+`python3 picks.py --run runs/run_<stamp>.json [--live-24h]` turns an hourly run into a short "Trenches picks" post:
+market line (BTC/ETH/SOL), 0-5 picks each with a 0-10 conviction score (callers, liquidity, holder concentration,
+mint/freeze authority, pair age, RugCheck), a one-line "Why" and "Risk", then "Not financial advice."
+Strict by default: a token is listed only with **2+ distinct callers in 24h and score >= 6**; otherwise
+"No buys this hour" plus the closest near-miss. Hard fails (rug, honeypot, live mint/freeze authority, RugCheck
+danger, top-10 > 30%) are never listed. Times use `DD_TZ` / `DD_TZ_LABEL`.
+
+## Telegram: multi-group posting, signal cards, bot profile
+
+- `telegram/config.json` may list `extra_chat_ids` (approved by the owner); `tg.py send` and `tg.py photo` fan out
+  to the main chat plus each extra, and one failing chat does not stop the others.
+- `telegram/trade_signal.py --side long --entry E --stop S --tp T [--status NEW|FILLED|TP HIT|STOPPED|CANCELLED]
+  [--dry-run|--send]` renders a BTC chart card (public OKX candles) with entry/stop/target and R:R and posts it via
+  tg.py. `SIGNAL_FOOTER` sets the footer, e.g. "Manual call · Not financial advice" vs the auto-trade default.
+- Setup calls (BTC, and discretionary gold) must always carry their reasoning: higher-timeframe bias, the setup,
+  and why entry, stop and targets sit where they do, plus the invalidation. Gold calls are judgment calls, not
+  backtested setups (see RESEARCH.md).
+- Call tracking: a 30-minute routine re-checks open calls and posts TRIGGERED / TP HIT / STOPPED / CANCELLED
+  updates (quiet when nothing changed).
+- `telegram/bot_profile.example.json`: description, short description and command menu for BotFather /
+  setMyDescription / setMyShortDescription / setMyCommands. Commands need a reply service; the profile picture
+  is set by the owner via @BotFather `/setuserpic`.
+
+## Lighter on Robinhood Chain market maker (shadow mode)
+
+`lighter-rh-mm/`: two-sided post-only quoting simulator for Lighter's Robinhood Chain deployment (USDG
+collateral, separate accounts/keys). Shadow only: records the real book and simulated fills; places no orders.
+See `lighter-rh-mm/README.md`.
+
 ## Changelog
+
+- **2026-10-11:** `picks.py` (strict Trenches picks with conviction scores); Telegram multi-group fan-out
+  (`extra_chat_ids`), `trade_signal.py` chart cards with `SIGNAL_FOOTER`, bot profile spec; autopilot `notify.py`
+  Telegram cards + `autopilot/TELEGRAM_SETUP.md` (off by default); `RESEARCH.md` (scalping and gold don't hold up;
+  BTC A+G+RIMC only); `lighter-rh-mm/` shadow-mode market maker; removed referral link from the Lighter skill.
 
 - **2026-10-09:** Added `autopilot/`, a BTC autopilot for Lighter (multi-timeframe SMC setups A, G and RIMC, backtested Feb 2022 to Oct 2026) with 1% default risk, 3x leverage cap, exchange-side stop + TP on every entry, daily stop, drawdown pause, kill switch and a one-command macOS installer (dry-run by default). Fixes in the autopilot's Lighter client: the signer client is created inside an event loop, the active-orders read passes auth correctly, and the installer no longer runs a key check. `skills/lighter-perps` gained an autopilot section.
 - **2026-10-08 to 09:** Lighter perps (`lighter.py`, `lighter/install-local.sh`, `lt` runner, `skills/lighter-perps`), template v3 support, clawd pack as 17 category skills.

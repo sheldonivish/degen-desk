@@ -1,6 +1,6 @@
 # BTC autopilot for Lighter (optional, runs on your Mac)
 
-An unattended BTC-perp bot for [Lighter](https://app.lighter.xyz/?ref=SHELDON) (the template author's referral link). It codes a set of multi-timeframe smart-money-concepts (SMC) rules from a trading course, checks them every minute on closed candles, and when a setup fires it places **one** grouped order on Lighter: entry + reduce-only stop-loss + reduce-only take-profit.
+An unattended BTC-perp bot for [Lighter](https://app.lighter.xyz). It codes a set of multi-timeframe smart-money-concepts (SMC) rules from a trading course, checks them every minute on closed candles, and when a setup fires it places **one** grouped order on Lighter: entry + reduce-only stop-loss + reduce-only take-profit.
 
 **This can lose money.** It is an experiment with a short out-of-sample record, not a proven system. It ships in **dry-run** (paper fills on live candles, nothing sent). Live trading needs you to pass `--live` yourself. Not financial advice.
 

@@ -23,7 +23,7 @@ KIT="$HOME/.agents/skills/lighter-agent-kit"
 mkdir -p "$DST/course_engine" "$HOME/Library/LaunchAgents"; chmod 700 "$HOME/.degen-desk" "$DST"
 # stop a running instance before replacing files
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-for f in autopilot.py strategy.py feed.py exchange.py notify.py run.sh uninstall.sh config.default.json; do
+for f in autopilot.py strategy.py feed.py exchange.py notify.py trade_signal.py run.sh uninstall.sh config.default.json; do
   install -m 600 "$SRC/$f" "$DST/$f"
 done
 chmod 700 "$DST/run.sh" "$DST/uninstall.sh" "$DST/autopilot.py"

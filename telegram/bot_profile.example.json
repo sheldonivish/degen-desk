@@ -1,0 +1,32 @@
+{
+  "setMyDescription": {
+    "description": "Degen Desk posts crypto trading signals and market notes.\n\n• BTC (and occasional gold) trade signals with chart, entry, stop and target\n• Hourly memecoin \"trenches picks\" with conviction scores (only tokens called by 2+ accounts)\n• BTC, ETH and SOL prices\n\nThe bot only posts to its groups and doesn't take trades for you. Not financial advice. Always do your own research."
+  },
+  "setMyShortDescription": {
+    "short_description": "BTC trade signals and hourly memecoin picks with conviction scores. Not financial advice."
+  },
+  "setMyCommands": {
+    "commands": [
+      {
+        "command": "start",
+        "description": "What Degen Desk does"
+      },
+      {
+        "command": "help",
+        "description": "How to read signals and picks"
+      },
+      {
+        "command": "picks",
+        "description": "Latest memecoin trenches picks"
+      },
+      {
+        "command": "signals",
+        "description": "Latest BTC trade signal"
+      },
+      {
+        "command": "about",
+        "description": "About Degen Desk and risk disclaimer"
+      }
+    ]
+  }
+}

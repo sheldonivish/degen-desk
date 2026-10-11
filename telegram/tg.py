@@ -5,6 +5,7 @@ Commands
   tg.py whoami                         getMe: show the bot's @username (read-only)
   tg.py chats                          getUpdates: list chats the bot has seen (read-only)
   tg.py send [--chat ID] --file F.md [--thread N] [--dry-run] [--require TEXT]
+  tg.py photo --file chart.png --caption-file cap.html [--require TEXT] [--dry-run]
   tg.py config [--chat ID] [--thread N|none] [--enable|--disable]   show/edit config.json
 
 The bot token is read from the TELEGRAM_BOT_TOKEN environment variable only. It is
@@ -396,10 +397,33 @@ def token():
     return tok
 
 
-def call(method, params=None, timeout=30):
+def _multipart(params, files):
+    """Encode params + files ({field: (filename, bytes, mime)}) as multipart/form-data (stdlib only)."""
+    boundary = "----degendesk" + os.urandom(12).hex()
+    out = bytearray()
+    for k, v in params.items():
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            v = json.dumps(v) if isinstance(v, (dict, list, bool)) else str(v)
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n").encode()
+        out += v.encode() + b"\r\n"
+    for k, (fname, blob, mime) in files.items():
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"; filename=\"{fname}\"\r\n"
+                f"Content-Type: {mime}\r\n\r\n").encode()
+        out += blob + b"\r\n"
+    out += f"--{boundary}--\r\n".encode()
+    return bytes(out), f"multipart/form-data; boundary={boundary}"
+
+
+def call(method, params=None, timeout=30, files=None):
     url = f"{API}/bot{token()}/{method}"
-    data = json.dumps(params or {}).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    if files:
+        data, ctype = _multipart(params or {}, files)
+        timeout = max(timeout, 60)
+    else:
+        data, ctype = json.dumps(params or {}).encode(), "application/json"
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": ctype})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = json.loads(r.read().decode())
@@ -416,11 +440,11 @@ def call(method, params=None, timeout=30):
     return body["result"]
 
 
-def call_with_retry(method, params, max_429=5, max_net=2):
+def call_with_retry(method, params, max_429=5, max_net=2, files=None):
     n429 = nnet = 0
     while True:
         try:
-            return call(method, params)
+            return call(method, params, files=files) if files else call(method, params)
         except TgError as e:
             if e.code == 429 and n429 < max_429:
                 n429 += 1
@@ -583,6 +607,98 @@ def cmd_send(a):
                       "chunks": len(chunks), "plain_text_fallbacks": plain_fallbacks}))
 
 
+CAPTION_LIMIT = 1024          # Telegram: 0-1024 chars of photo caption after entity parsing
+
+
+def resolve_destination(cfg, chat_arg=None, thread_arg=None, allow_other_chat=False):
+    """Same guard rails as `send`: config must be enabled and the chat must be the approved one."""
+    if not cfg.get("enabled"):
+        die("sending is disabled in config.json (enabled=false). Enable it only after the owner "
+            "has approved the destination.")
+    chat = chat_arg if chat_arg is not None else cfg.get("chat_id")
+    thread = thread_arg if thread_arg is not None else (cfg.get("thread_id") if chat_arg is None else None)
+    if chat is None:
+        die("no chat id: pass --chat or set chat_id in config.json")
+    if chat_arg is not None and cfg.get("chat_id") is not None and str(chat_arg) != str(cfg["chat_id"]) \
+            and not allow_other_chat:
+        die("--chat differs from the approved chat_id in config.json; pass --allow-other-chat "
+            "only if the owner approved this destination too")
+    return chat, thread
+
+
+def send_photo(chat, photo_path, caption_html, thread=None):
+    """sendPhoto with an HTML caption (<= 1024 visible chars). Falls back to a plain caption if
+    Telegram can't parse the HTML. Returns the sent Message dict."""
+    if vlen(caption_html) > CAPTION_LIMIT:
+        die(f"caption is {vlen(caption_html)} visible chars; Telegram allows {CAPTION_LIMIT}")
+    if not well_formed(caption_html):
+        die("caption HTML is not well-formed")
+    blob = Path(photo_path).read_bytes()
+    mime = "image/jpeg" if str(photo_path).lower().endswith((".jpg", ".jpeg")) else "image/png"
+    params = {"chat_id": chat, "caption": caption_html, "parse_mode": "HTML"}
+    if thread:
+        params["message_thread_id"] = int(thread)
+    files = {"photo": (Path(photo_path).name, blob, mime)}
+    try:
+        return call_with_retry("sendPhoto", params, files=files)
+    except TgError as e:
+        if e.code == 400 and "parse" in e.description.lower():
+            params.pop("parse_mode")
+            params["caption"] = visible(caption_html)
+            return call_with_retry("sendPhoto", params, files=files)
+        raise
+
+
+def cmd_photo(a):
+    cap = Path(a.caption_file).read_text(encoding="utf-8").strip() if a.caption_file else (a.caption or "")
+    if a.require and a.require.lower() not in visible(cap).lower():
+        die(f"caption does not contain required text {a.require!r}; not sending")
+    if not Path(a.file).exists():
+        die(f"no such image: {a.file}")
+    cfg = load_config(a.config)
+    if a.dry_run:
+        print(f"# dry run: photo {a.file} -> chat {cfg.get('chat_id')!r} (enabled={cfg.get('enabled')}); "
+              f"caption {vlen(cap)}/{CAPTION_LIMIT} visible chars, well-formed={well_formed(cap)}; nothing sent")
+        print(cap)
+        return
+    chat, thread = resolve_destination(cfg, a.chat, a.thread, a.allow_other_chat)
+    msg = send_photo(chat, a.file, cap, thread)
+    print(json.dumps({"ok": True, "chat_id": chat, "thread_id": thread, "message_ids": [msg["message_id"]]}))
+
+
+def fan_out(a, extras):
+    """Send the same report/photo to the primary chat and every owner-approved chat in
+    config.json `extra_chat_ids`. One chat failing does not stop the others. Last stdout line is a
+    summary {"ok": all_ok, "results": [...]}; exit code 2 if any chat failed."""
+    import copy, io, contextlib
+    fn = cmd_send if a.cmd == "send" else cmd_photo
+    results = []
+    for i, chat in enumerate([None] + list(extras)):
+        b = copy.copy(a)
+        if chat is not None:
+            b.chat, b.thread, b.allow_other_chat = str(chat), None, True
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                fn(b)
+            line = buf.getvalue().strip().splitlines()[-1]
+            results.append(json.loads(line))
+        except SystemExit as e:
+            out = buf.getvalue().strip().splitlines()
+            err = out[-1] if out else ""
+            results.append({"ok": False, "chat_id": chat, "exit": e.code, "detail": scrub(err)})
+        except Exception as e:
+            results.append({"ok": False, "chat_id": chat, "error": scrub(f"{type(e).__name__}: {e}")})
+        if i < len(extras):
+            time.sleep(1.5)
+    ok = all(r.get("ok") for r in results)
+    first = results[0]
+    print(json.dumps({"ok": ok, "chat_id": first.get("chat_id"), "message_ids": first.get("message_ids", []),
+                      "results": results}))
+    if not ok:
+        sys.exit(2)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config", default=str(DEFAULT_CONFIG))
@@ -604,9 +720,23 @@ def main(argv=None):
     s.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
     s.add_argument("--delay", type=float, default=1.5, help="seconds between chunks")
     s.add_argument("--allow-other-chat", action="store_true")
+    ph = sub.add_parser("photo", help="send one image with an HTML caption (<=1024 chars)")
+    ph.add_argument("--file", required=True, help="PNG/JPEG to send")
+    ph.add_argument("--caption-file", help="file holding the caption as Telegram HTML")
+    ph.add_argument("--caption", help="caption as Telegram HTML (alternative to --caption-file)")
+    ph.add_argument("--chat")
+    ph.add_argument("--thread", type=int)
+    ph.add_argument("--require")
+    ph.add_argument("--dry-run", action="store_true")
+    ph.add_argument("--allow-other-chat", action="store_true")
     a = p.parse_args(argv)
     try:
-        {"whoami": cmd_whoami, "chats": cmd_chats, "send": cmd_send, "config": cmd_config}[a.cmd](a)
+        if a.cmd in ("send", "photo") and not a.dry_run and a.chat is None:
+            extras = load_config(a.config).get("extra_chat_ids") or []
+            if extras:
+                return fan_out(a, extras)
+        {"whoami": cmd_whoami, "chats": cmd_chats, "send": cmd_send, "config": cmd_config,
+         "photo": cmd_photo}[a.cmd](a)
     except TgError as e:
         die(str(e), code=2)
     except Exception as e:  # never let a traceback carry the token

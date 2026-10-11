@@ -21,7 +21,7 @@ Lighter rejects sends from restricted jurisdictions, and that includes this bot'
 - Preview and place on the **same** computer: the approval code lives in that computer's `~/.degen-desk/lighter/pending.json`.
 
 ## 1. Owner's computer setup (one time)
-1. Lighter account: the template author's referral link is https://app.lighter.xyz/?ref=SHELDON (say it's a referral link). Connect the wallet, make a **sub-account** holding only trading money, fund it with USDC.
+1. Lighter account at https://app.lighter.xyz. Connect the wallet, make a **sub-account** holding only trading money, fund it with USDC.
 2. Switch to that sub-account, open https://app.lighter.xyz/apikeys and create an API key in **slot 4–254** (0–3 are Lighter's own apps). The wallet signs once; the private key is shown once.
 3. Install (no key involved; the bot may run it on their computer, or they paste it in Terminal):
    `curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/lighter/install-local.sh | bash -s -- --account <INDEX> --slot <SLOT>`
