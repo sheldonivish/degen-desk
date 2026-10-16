@@ -3,7 +3,7 @@ name: lighter-perps
 description: >-
   Use when trading, scalping or checking perps on Lighter (lighter.xyz /
   zkLighter): prices, order books, funding, positions, practice (paper)
-  trades, 1%-risk position sizing, setting up Lighter on the owner's own
+  trades, the Robinhood Chain shadow market maker, autopilot research results, 1%-risk position sizing, setting up Lighter on the owner's own
   computer, or placing, closing or cancelling a Lighter order through the gated
   preview, approve, place flow.
 ---
@@ -56,6 +56,17 @@ An unattended BTC bot, `autopilot/` in the Degen Desk repo (guide: `autopilot/RE
 - Guardrails: 1% risk/trade by default (hard ceiling 2%), 3x leverage cap, one position, -4% daily stop, -15% drawdown pause, 24h max hold.
 - Check: `~/.degen-desk/autopilot/venv/bin/python3 ~/.degen-desk/autopilot/autopilot.py status`. Stop (kill switch, closes the BTC position): `... autopilot.py stop`; `pause` / `resume`; remove: `bash ~/.degen-desk/autopilot/uninstall.sh`.
 - Turning the autopilot on is the owner's standing approval for its own trades within these limits; it never replaces the preview → approve flow for manual orders. Never raise risk above the ceiling or disable a guardrail on request without restating the risk and getting an explicit yes.
+
+## 7. Autopilot research results (don't re-litigate without new data)
+- Keep the autopilot at **A + G + RIMC on BTC only** (summary: `RESEARCH.md` in the repo). No extra setup added trades without weakening the edge.
+- **Scalping (1m-5m) and gold (PAXG / XAU perp) do not hold up** out of sample; ETH failed too. Don't automate them. Gold calls, if the owner wants them, are discretionary and must be labelled "judgment call, not a tested setup".
+- Keep 1% risk per trade (2% hard ceiling); at 2% the in-sample drawdown can trip the 15% pause.
+- Telegram cards from the autopilot: `autopilot/notify.py` + `trade_signal.py`, set up per `autopilot/TELEGRAM_SETUP.md` (token in the owner's Keychain, telegram disabled by default, one approved group). If the autopilot posts a trade, don't also post it manually.
+
+## 8. Lighter on Robinhood Chain: market maker (shadow mode)
+- A separate Lighter deployment (`api.rh.lighter.xyz`): own chain, **USDG** collateral, separate accounts and API keys (a regular Lighter key doesn't work), markets mostly tokenized stocks/stock perps plus BTC. Official agent kit: github.com/elliottech/lighter-agent-kit.
+- Bot: `lighter-rh-mm/` in the repo. `cp config.example.json config.json`, then `python3 mm.py --feed ws` (or `--feed poll` if the websocket is blocked; poll results are less reliable). It records the real book and simulates post-only two-sided quotes with inventory skew, exposure/leverage caps, daily loss limit, stale-feed stop and a STOP file. **It places no orders**; live placement is not implemented.
+- Run shadow for 1-2 weeks on an always-on machine the exchange allows, report fills, markouts and simulated PnL honestly (tight competing quotes and possible maker fees can make it unprofitable). Going live needs a separate build, the owner's explicit approval, a dedicated key in the OS keychain (never in chat), and tiny size.
 
 ## 5. Risks (say them plainly)
 - **No trade-only key exists.** A Lighter API key can trade, cancel, change leverage and margin, move funds between the owner's own accounts and make secure withdrawals (to the owner's own wallet only). Anyone with the key could trade the account to zero, so keep only trading money in that sub-account.
