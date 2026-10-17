@@ -1,0 +1,2 @@
+# /etc/cron.d/popdex-mm-cleanup : delete market-data recordings older than 7 days (~750 MB/day)
+17 3 * * * degen find /opt/popdex-mm/data -name "rec_*.jsonl" -mtime +7 -delete

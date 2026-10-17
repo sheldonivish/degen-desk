@@ -9,7 +9,7 @@ Free, keyless memecoin trenches research tools. Degen Desk is the data side of a
 - **Telegram delivery**: posts the report to one approved Telegram group, channel, topic or DM through your own bot, with clean formatting and safe splitting.
 - **Optional Lighter perps** (`lighter.py`) and a **BTC autopilot for Lighter** (`autopilot/`) that run only on your own computer, with your own key, dry-run by default.
 
-**Research first.** The report and research tools never build, sign or send a transaction, order or payment. The only parts that can place orders are the optional Lighter tools (`lighter.py` and `autopilot/`), and only on your own computer with an API key you store yourself; both default to dry-run. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
+**Research first.** The report and research tools never build, sign or send a transaction, order or payment. The only parts that can place orders are the optional trading tools (`lighter.py`, `autopilot/`, `calls/`, `popdex-mm/`), and only on your own computer or your own VPS with keys you store yourself; all default to dry-run, practice or shadow mode. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
 
 ## Install
 
@@ -50,6 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/instal
 - `lists.example.txt`: template for `lists.txt` (your X list IDs).
 - `install-skills.sh`, `clawd/build_pack.py`, `clawd/pack.tsv`: the clawd pack installer, adapter and money-moving flags. `clawd/consolidate.py`, `clawd/categories.tsv`: groups the pack into the 17 category router skills (category, purpose, needs and money flag per sub-skill). `skills/degen-desk-skill-map/SKILL.md`: the skill router it installs.
 - `autopilot/`: the optional BTC autopilot for Lighter (macOS launchd agent, dry-run by default). See [BTC autopilot](#btc-autopilot-for-lighter-optional-runs-on-your-mac) and [`autopilot/README.md`](autopilot/README.md).
+- `vps/`, `calls/`, `popdex-mm/`: VPS deploy kit, Lighter call auto-execution, PopDEX volume market maker (all practice/shadow by default).
 - `lighter.py`: Lighter perps (keyless reads, paper, gated orders). `lighter/install-local.sh` and `lighter/lt`: set it up for live trading on your own computer. `skills/lighter-perps/SKILL.md`: the bot's Lighter run book. See [Lighter perps](#lighter-perps-optional-gated).
 - Created on your machine and never committed: `calls.jsonl` (running call log, one row per post + CA), `dex_cache.json` (last good DexScreener lookup per CA, used only when DexScreener rate-limits), `runs/` (inputs and outputs of every run), `lists.txt`, `telegram/config.json`.
 
@@ -234,7 +235,40 @@ danger, top-10 > 30%) are never listed. Times use `DD_TZ` / `DD_TZ_LABEL`.
 collateral, separate accounts/keys). Shadow only: records the real book and simulated fills; places no orders.
 See `lighter-rh-mm/README.md`.
 
+## Run bots 24/7 on your own VPS (optional)
+
+`vps/`: deploy the call executor, the BTC autopilot and the PopDEX market maker to your own Ubuntu server (tested on a
+Vultr 1 vCPU / 2 GB plan, Ubuntu 24.04). `vps.py` (paramiko SSH/SFTP + ed25519 keygen for boxes with no ssh client),
+`bootstrap.sh` (user `degen`, ufw SSH-only, password login off), `geo_check.sh` (location + venue reachability; a geo-block is
+final, never route around it), and `systemd/` unit templates that start in practice/shadow mode, with separate live drop-ins.
+Secrets live only in chmod-600 env files on the server. Run one live copy per account. See `vps/README.md`.
+
+## Auto-trade BTC / gold calls on Lighter (optional)
+
+`calls/`: `push_calls.py` delivers every posted call from the bot's call log to the server's inbox over SFTP (atomic
+files, acks, resends, ALERTs); `calls_exec.py` places it on Lighter: configured risk (2% default) floored to the lot, leverage
+and 4% total-risk caps, GTT entry split into two OTOCO halves (TP1 and TP2 runner) with reduce-only exchange stops, OKX to
+Lighter price offset, cancel on expiry, invalidation or TP1-first, stop moves, daily loss stop, drawdown pause, STOP file.
+Calls take priority over the autopilot (`calls/busy_BTC`). PRACTICE until `CALLS_LIVE=1`. See `calls/README.md`.
+
+## PopDEX volume market maker (optional)
+
+`popdex-mm/`: small post-only BTC quotes on PopDEX to build volume. It costs money (about $8 to $35 per $100k of volume),
+it doesn't earn it. Shadow first; then the owner signs `approveAgent` for a trade-only agent key (can't withdraw) through a
+generated page on gasless chain 2184; then one tiny test order; then live with a volume target and a run cost cap. Safe on
+an account you also trade: own DDMM-tagged orders only (ASCII clientOrderId), never cancel-all or reduce-only in one-way mode,
+fills from the exchange's order history, position reconcile and margin floor. See `popdex-mm/README.md`.
+
 ## Changelog
+
+- **2026-10-17 (v7):** VPS deployment kit (`vps/`), live call auto-execution on Lighter (`calls/`), PopDEX volume market
+  maker with agent-key approval and live executor (`popdex-mm/`). Autopilot: yields to active calls (`calls/busy_BTC`),
+  `exchange.cancel_order`, fixed the active-orders read (duplicate `auth` argument broke order checks in live mode),
+  "PRACTICE TRADE" labels on dry-run Telegram posts (`AUTOPILOT_PRACTICE=1`). `telegram/trade_signal.py` can hand each sent
+  call to the VPS (`DD_PUSH_CALLS`). New skills `vps-bot-deploy`, `lighter-call-autoexec`, `popdex-market-maker`;
+  `btc-gold-setup-calls` gained aggressive mode, the self-improvement loop (post-mortems + LESSONS.md rules) and live
+  auto-execution; skill map and getting-started updated.
+- **2026-10-12 (v6):** `btc-gold-setup-calls` and `telegram-report-delivery` skills; synced Lighter and memecoin skills.
 
 - **2026-10-11:** `picks.py` (strict Trenches picks with conviction scores); Telegram multi-group fan-out
   (`extra_chat_ids`), `trade_signal.py` chart cards with `SIGNAL_FOOTER`, bot profile spec; autopilot `notify.py`

@@ -1,0 +1,15 @@
+[Unit]
+Description=PopDEX BTCUSDT market maker (SHADOW unless the live drop-in is installed)
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=degen
+WorkingDirectory=/opt/popdex-mm
+ExecStart=/opt/popdex-mm/.venv/bin/python -u /opt/popdex-mm/mm.py
+Restart=always
+RestartSec=5
+MemoryMax=300M
+MemoryHigh=250M
+Nice=5
+[Install]
+WantedBy=multi-user.target

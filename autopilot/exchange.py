@@ -288,7 +288,7 @@ class LighterExchange:
         api = lighter.OrderApi(self._client.api_client)
         if not auth:
             raise RuntimeError("auth token: empty")
-        r = self._run(api.account_active_orders(authorization=auth, auth=auth, account_index=self.acct, market_id=self.meta.market_id))
+        r = self._run(api.account_active_orders(authorization=auth, account_index=self.acct, market_id=self.meta.market_id))
         out = []
         for o in (r.orders or []):
             t = o.type
@@ -349,6 +349,12 @@ class LighterExchange:
             return await c.create_grouped_orders(grouping_type=g, orders=orders)
         r = self._send(f); r["client_order_ids"] = ids
         return r
+
+    def cancel_order(self, order_index):
+        m = self.meta.market_id
+        async def f(c):
+            return await c.cancel_order(m, int(order_index))
+        return self._send(f)
 
     def cancel_all(self):
         m = self.meta.market_id

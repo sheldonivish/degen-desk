@@ -1,0 +1,19 @@
+[Unit]
+Description=Degen Desk call executor (BTC/XAU calls -> Lighter orders; PRACTICE unless CALLS_LIVE=1)
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=degen
+WorkingDirectory=/opt/degen-desk
+Environment=AUTOPILOT_HOME=/opt/degen-desk
+Environment=PYTHONUNBUFFERED=1
+# chmod 600, owned by degen. .env: LIGHTER_API_PRIVATE_KEY=... (+ LIGHTER_ACCOUNT_INDEX, LIGHTER_API_KEY_INDEX)
+# telegram.env: TELEGRAM_BOT_TOKEN=...   Live: add CALLS_LIVE=1 via the drop-in calls-live.conf
+EnvironmentFile=/opt/degen-desk/telegram.env
+EnvironmentFile=/opt/degen-desk/.env
+ExecStart=/opt/degen-desk/venv/bin/python /opt/degen-desk/calls_exec.py
+Restart=always
+RestartSec=15
+MemoryMax=300M
+[Install]
+WantedBy=multi-user.target

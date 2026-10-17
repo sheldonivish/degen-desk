@@ -1,0 +1,19 @@
+[Unit]
+Description=Degen Desk BTC autopilot on Lighter (dry-run; switch ExecStart to --live only on the owner's yes)
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=degen
+WorkingDirectory=/opt/degen-desk
+Environment=AUTOPILOT_HOME=/opt/degen-desk
+Environment=PYTHONUNBUFFERED=1
+# labels every Telegram post "PRACTICE TRADE, no real money"; remove for live
+Environment=AUTOPILOT_PRACTICE=1
+EnvironmentFile=/opt/degen-desk/telegram.env
+EnvironmentFile=/opt/degen-desk/.env
+ExecStart=/opt/degen-desk/venv/bin/python /opt/degen-desk/autopilot.py run --dry-run
+Restart=always
+RestartSec=15
+MemoryMax=400M
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+{
+ "_note": "Copy to /opt/degen-desk/calls/config.json. Index numbers are not secret but are yours; the API key lives only in .env.",
+ "account_index": null,
+ "api_key_index": null,
+ "risk": 0.02,
+ "max_total_risk": 0.04,
+ "daily_loss": 0.04,
+ "drawdown": 0.15,
+ "lev_cap": {"BTC": 10, "XAU": 15},
+ "max_basis_pct": 0.3,
+ "chat_id": null
+}

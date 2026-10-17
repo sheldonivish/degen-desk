@@ -277,6 +277,25 @@ def main(argv=None):
                  "--dry-run"])
         return
     tg.main(["photo", "--file", str(out), "--caption-file", str(cap_path), "--require", "Not financial advice"])
+    push_to_vps()
+
+
+def push_to_vps():
+    """Optional: hand every sent call/update to the VPS call executor (calls/push_calls.py, see calls/README.md).
+    Off unless DD_PUSH_CALLS points to push_calls.py. The watcher re-syncs the call log every 20 s for 10 min,
+    retries and waits for the executor's ack; failures are ALERT lines in its log. Opt out: DEGEN_NO_VPS=1."""
+    import subprocess
+    script = os.environ.get("DD_PUSH_CALLS")
+    if not script or os.environ.get("DEGEN_NO_VPS") or not Path(script).exists():
+        return
+    py = os.environ.get("DD_PUSH_PY", sys.executable)
+    log = Path(os.environ.get("DD_CALLS_DIR", str(Path(script).parent))) / "vps_sync.log"
+    try:
+        subprocess.Popen([py, script, "watch", "--minutes", "10"], stdout=subprocess.DEVNULL,
+                         stderr=open(log, "a"), start_new_session=True)
+        print(f"VPS call executor: sync started (see {log})", file=sys.stderr)
+    except Exception as e:
+        print(f"ALERT: could not start VPS sync: {e}. Run: {py} {script} sync", file=sys.stderr)
 
 
 if __name__ == "__main__":

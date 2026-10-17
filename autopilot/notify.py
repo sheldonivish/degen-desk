@@ -38,6 +38,17 @@ def _token():
     return ""
 
 
+PRACTICE = os.environ.get("AUTOPILOT_PRACTICE") == "1"
+
+
+def _practice(text, is_html):
+    """Dry-run service: every message is labelled as a practice trade."""
+    if not PRACTICE:
+        return text
+    lab = "PRACTICE TRADE, no real money"
+    return (f"<b>{lab}</b>\n" if is_html else lab + "\n") + text
+
+
 def _scrub(s):
     return TOKEN_RE.sub("bot<TOKEN>", str(s))[:200]
 
@@ -203,6 +214,7 @@ class Telegram:
         return body["result"]
 
     def _send_text(self, text, parse_mode=None):
+        text = _practice(text, parse_mode == "HTML")
         body = {"chat_id": self.chat_id, "text": text[:4000], "link_preview_options": {"is_disabled": True}}
         if parse_mode:
             body["parse_mode"] = parse_mode
@@ -212,6 +224,7 @@ class Telegram:
 
     def _send_photo(self, path, caption):
         b = "----degendesk" + os.urandom(8).hex()
+        caption = _practice(caption, True)[:1024]
         fields = {"chat_id": str(self.chat_id), "caption": caption, "parse_mode": "HTML"}
         if self.thread_id:
             fields["message_thread_id"] = str(self.thread_id)

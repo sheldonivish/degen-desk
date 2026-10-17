@@ -171,6 +171,7 @@ class Autopilot:
         if st["paused"]: why.append("paused: " + str(st["pause_reason"]))
         if st["day_halted"]: why.append("daily loss stop")
         if st["open_trade"]: why.append("position open")
+        if (self.home / "calls" / "busy_BTC").exists(): why.append("call executor owns BTC (calls take priority)")
         lt = self.store.last_ts() if self.store else None
         if self.store is not None and (lt is None or now - (lt + M1) > self.cfg["max_data_lag_s"] * 1000):
             why.append("candle data stale")
@@ -211,6 +212,8 @@ class Autopilot:
         if pos and not ot:
             if ag:
                 return
+            if (self.home / "calls" / "busy_BTC").exists():
+                return                                   # the position belongs to the call executor: hands off
             self.log("orphan_position", position=pos, policy=self.cfg["orphan_policy"])
             if self.cfg["orphan_policy"] == "protect" and self.ex.live:
                 orders = self.ex.active_orders()

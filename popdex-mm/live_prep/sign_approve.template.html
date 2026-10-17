@@ -1,0 +1,29 @@
+<!doctype html><meta charset=utf-8><title>Approve PopDEX trading agent</title>
+<body style="font-family:sans-serif;max-width:680px;margin:40px auto">
+<h2>Approve PopDEX trading agent (Degen Desk MM)</h2>
+<p>Main wallet: <code id=w>__MAIN_WALLET__</code><br>
+Agent (trade-only, cannot withdraw): <code id=a>__AGENT_ADDRESS__</code><br>
+Contract: Account 0x0000000000000000000000000000000000001008, chain 2184 (Morph Tachyon, gasless)</p>
+<button id=b style="font-size:18px;padding:10px 20px">Connect wallet and sign</button>
+<pre id=o style="white-space:pre-wrap"></pre>
+<script>
+const MAIN=document.getElementById('w').textContent.toLowerCase(), AGENT=document.getElementById('a').textContent.toLowerCase();
+const pad=h=>h.replace(/^0x/,'').padStart(64,'0');
+const log=t=>document.getElementById('o').textContent+=t+"\n";
+document.getElementById('b').onclick=async()=>{
+ try{
+  const eth=window.ethereum; if(!eth) return log("No wallet found. Open this in a browser with MetaMask or Rabby.");
+  const [acc]=await eth.request({method:'eth_requestAccounts'});
+  if(acc.toLowerCase()!==MAIN) return log("Wrong account: "+acc+". Switch to "+MAIN);
+  try{await eth.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x888'}]});}
+  catch(e){await eth.request({method:'wallet_addEthereumChain',params:[{chainId:'0x888',chainName:'Morph Tachyon',
+     rpcUrls:['https://app.popdex.xyz/api/v1/web3/rpc'],nativeCurrency:{name:'GAS',symbol:'GAS',decimals:18},
+     blockExplorerUrls:['https://app.popdex.xyz/explorer']}]});}
+  // approveAgent(agent, delegator, name=0, expiresAt=0 (never), initialNonce=now ms, isGlobal=false)
+  const data='0xd4c647da'+pad(AGENT)+pad(MAIN)+pad('0')+pad('0')+pad(Date.now().toString(16))+pad('0');
+  log("calldata: "+data);
+  const h=await eth.request({method:'eth_sendTransaction',params:[{from:acc,to:'0x0000000000000000000000000000000000001008',data,value:'0x0',gasPrice:'0x0'}]});
+  log("Sent. Tx hash: "+h+"\nTell Degen Desk it's done.");
+ }catch(e){log("Error: "+(e.message||e));}
+};
+</script>
