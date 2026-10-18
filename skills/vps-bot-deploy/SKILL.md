@@ -1,15 +1,15 @@
 ---
 name: vps-bot-deploy
 description: >-
-  Use when the owner wants a trading bot (Lighter call executor, BTC autopilot,
-  PopDEX market maker or similar) to run 24/7 on their own Ubuntu VPS (e.g. Vultr):
+  Use when the owner wants a trading bot (Lighter call executor, BTC autopilot on
+  Lighter or Arcus, PopDEX market maker or similar) to run 24/7 on their own Ubuntu VPS (e.g. Vultr):
   pick the server, connect by key-only SSH (paramiko if the box has no ssh), check
   the venue is reachable and allowed there, harden it, install systemd services in
   practice mode, and switch to live only on the owner's explicit yes.
 ---
 # Deploy a trading bot to a VPS
 
-Code templates: degen-desk repo `vps/` (vps.py, bootstrap.sh, geo_check.sh, systemd/). Not financial advice.
+Code templates: degen-desk repo `vps/` (vps.py, bootstrap.sh, geo_check.sh, systemd/); Arcus autopilot: `arcus/` (see `arcus-autopilot`). Not financial advice.
 
 ## 1. Server
 - Recommend a small plan: 1 vCPU, 2 GB RAM, NVMe (e.g. Vultr High Frequency, ~$12/month) running **Ubuntu 24.04 LTS**,
@@ -21,7 +21,7 @@ Code templates: degen-desk repo `vps/` (vps.py, bootstrap.sh, geo_check.sh, syst
 
 ## 2. Reachability before any key
 Run `geo_check.sh` on the server: ipinfo location, then HTTP codes for the venue APIs (Lighter mainnet API, app,
-Hyperliquid, PopDEX, OKX). Continue only on 200s and if the venue's terms allow that country. A geo-block
+Hyperliquid, PopDEX, OKX, Arcus `https://api.arcus.xyz/health` and `/v1/markets`). Continue only on 200s and if the venue's terms allow that country. A geo-block
 (403/451/"restricted jurisdiction") is final: never suggest a VPN, proxy or another region to dodge it without the owner
 checking the terms.
 
@@ -41,10 +41,14 @@ for SSH and the provider's web console is the fallback.
 
 ## 5. Practice -> live
 - Every bot starts in practice/shadow/dry-run. Live is a separate, explicit flag: a systemd drop-in (`CALLS_LIVE=1`,
-  `POPDEX_LIVE=1`) or `--live`, installed only after the owner says "go live" for that bot and account.
+  `POPDEX_LIVE=1`) or `--live` (Arcus: `autopilot.py run --dry-run` -> `run --live`), installed only after the owner says "go live" for that bot and account.
 - **One live instance per account**: before switching, find and stop every other copy (owner's Mac launchd agent, an old
   service). Two copies double positions. Check the account has no unexpected positions/orders first, and ask about any
   position the bot didn't open.
+- Two bots on the same signals (e.g. Lighter and Arcus autopilots): cap combined open risk across venues with a shared
+  risk ledger file; if the other bot's state is unreadable or stale, assume it is at its full cap.
+- Arcus: set exchange leverage to the cap with signed setLeverage before going live (accounts default to the exchange max),
+  and place one tiny test trade to confirm SL/TP attach.
 - After switching: confirm the service is active, the balance reads, nothing unexpected is resting. Report once.
 - Kill switch: `touch /opt/<bot>/STOP` or `systemctl stop <unit>`; tell the owner "stop the bot" works anytime.
 

@@ -1,0 +1,24 @@
+[Unit]
+Description=Degen Desk BTC autopilot on Arcus (PRACTICE: --dry-run; switch to --live only on the owner's yes)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=degen
+Group=degen
+WorkingDirectory=/opt/arcus-desk
+# chmod 600, owner degen. .env: ARCUS_API_KEY, ARCUS_SIGNING_KEY, ARCUS_ADDRESS, ARCUS_ACCOUNT_INDEX
+# telegram.env: TELEGRAM_BOT_TOKEN (optional)
+EnvironmentFile=/opt/arcus-desk/.env
+EnvironmentFile=-/opt/arcus-desk/telegram.env
+Environment=AUTOPILOT_HOME=/opt/arcus-desk
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/arcus-desk/venv/bin/python /opt/arcus-desk/autopilot.py run --dry-run
+Restart=always
+RestartSec=15
+MemoryMax=400M
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

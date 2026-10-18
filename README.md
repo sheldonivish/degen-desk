@@ -8,8 +8,11 @@ Free, keyless memecoin trenches research tools. Degen Desk is the data side of a
 - **Read-only market modes**: Jupiter quote with buy + sell-back round-trip loss, Raydium pools, Backpack markets and funding, tokenized stocks / RWA, Kalshi and Jupiter prediction markets, ORE mining, Metaplex agents.
 - **Telegram delivery**: posts the report to one approved Telegram group, channel, topic or DM through your own bot, with clean formatting and safe splitting.
 - **Optional Lighter perps** (`lighter.py`) and a **BTC autopilot for Lighter** (`autopilot/`) that run only on your own computer, with your own key, dry-run by default.
+- **Optional perps bots on your own VPS**: live call auto-execution on Lighter (`calls/`), the BTC autopilot on **Arcus** (`arcus/`), and a PopDEX volume market maker (`popdex-mm/`), all practice mode by default.
 
-**Research first.** The report and research tools never build, sign or send a transaction, order or payment. The only parts that can place orders are the optional trading tools (`lighter.py`, `autopilot/`, `calls/`, `popdex-mm/`), and only on your own computer or your own VPS with keys you store yourself; all default to dry-run, practice or shadow mode. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
+The hourly memecoin report is optional: the bot template ships with that routine off, and the perps tools work without it.
+
+**Research first.** The report and research tools never build, sign or send a transaction, order or payment. The only parts that can place orders are the optional trading tools (`lighter.py`, `autopilot/`, `calls/`, `arcus/`, `popdex-mm/`), and only on your own computer or your own VPS with keys you store yourself; all default to dry-run, practice or shadow mode. There is no wallet, no private key and no API key anywhere in this repo. Not financial advice.
 
 ## Install
 
@@ -51,6 +54,8 @@ curl -fsSL https://raw.githubusercontent.com/sheldonivish/degen-desk/main/instal
 - `install-skills.sh`, `clawd/build_pack.py`, `clawd/pack.tsv`: the clawd pack installer, adapter and money-moving flags. `clawd/consolidate.py`, `clawd/categories.tsv`: groups the pack into the 17 category router skills (category, purpose, needs and money flag per sub-skill). `skills/degen-desk-skill-map/SKILL.md`: the skill router it installs.
 - `autopilot/`: the optional BTC autopilot for Lighter (macOS launchd agent, dry-run by default). See [BTC autopilot](#btc-autopilot-for-lighter-optional-runs-on-your-mac) and [`autopilot/README.md`](autopilot/README.md).
 - `vps/`, `calls/`, `popdex-mm/`: VPS deploy kit, Lighter call auto-execution, PopDEX volume market maker (all practice/shadow by default).
+- `arcus/`: BTC autopilot on Arcus perps (adapter, systemd template, runbook, backtest summaries; practice by default). See [`arcus/README.md`](arcus/README.md).
+- `skills/`: the bot's Degen Desk skills (reference copies), including `arcus-autopilot`.
 - `lighter.py`: Lighter perps (keyless reads, paper, gated orders). `lighter/install-local.sh` and `lighter/lt`: set it up for live trading on your own computer. `skills/lighter-perps/SKILL.md`: the bot's Lighter run book. See [Lighter perps](#lighter-perps-optional-gated).
 - Created on your machine and never committed: `calls.jsonl` (running call log, one row per post + CA), `dex_cache.json` (last good DexScreener lookup per CA, used only when DexScreener rate-limits), `runs/` (inputs and outputs of every run), `lists.txt`, `telegram/config.json`.
 
@@ -259,8 +264,21 @@ generated page on gasless chain 2184; then one tiny test order; then live with a
 an account you also trade: own DDMM-tagged orders only (ASCII clientOrderId), never cancel-all or reduce-only in one-way mode,
 fills from the exchange's order history, position reconcile and margin floor. See `popdex-mm/README.md`.
 
+## BTC autopilot on Arcus (optional)
+
+`arcus/`: the same A + G + RIMC BTC autopilot on [Arcus](https://arcus.xyz) perps (Robinhood Chain, USDG). Ed25519 API key
+pair (public key + signing key + wallet address + subaccount, kept in a chmod-600 env file on your VPS), signed
+`setLeverage` to a 10x cap before every entry, IOC or `entryTpsl` entries with exchange-side SL/TP (a TP on the wrong side of
+the oracle is deferred until the fill), dead-man switch only while a limit entry rests, 1% risk hard cap, −3% daily stop,
+−10% drawdown pause, and a combined risk ledger so it and a Lighter desk on the same signals stay under 2% total. Practice
+(`--dry-run`) until you install the live drop-in. Backtests with Arcus fees: the autopilot held up (OOS PF ~2.1, DD ~−4%);
+scalping and new 5m/15m setups failed (`arcus/backtests/`). See `arcus/README.md`.
+
 ## Changelog
 
+- **2026-10-18 (v8):** Arcus BTC autopilot (`arcus/`: adapter, setup script, practice systemd unit + live drop-in, runbook,
+  backtest summaries). New skill `arcus-autopilot`; skill map, getting-started and `vps-bot-deploy` mention Arcus;
+  `geo_check.sh` checks Arcus. The memecoin report routine is now optional and off by default in the bot template.
 - **2026-10-17 (v7):** VPS deployment kit (`vps/`), live call auto-execution on Lighter (`calls/`), PopDEX volume market
   maker with agent-key approval and live executor (`popdex-mm/`). Autopilot: yields to active calls (`calls/busy_BTC`),
   `exchange.cancel_order`, fixed the active-orders read (duplicate `auth` argument broke order checks in live mode),
