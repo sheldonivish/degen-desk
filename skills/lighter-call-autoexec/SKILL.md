@@ -36,6 +36,13 @@ Every call is real money once live: post it carefully. Not financial advice.
 - Unfilled entry cancelled at expiry or when price tags TP1 first. Call CANCELLED/INVALIDATED -> its orders are cancelled
   (flatten only if the message says close_if_filled). Changed levels on an unfilled call -> cancel + re-place. Changed stop
   on a filled call -> new exchange stop placed first, old one cancelled. Missing stop -> re-placed, else flatten.
+- Partial entry fills: the recorded size and risk are the size that actually filled (read from the order history), not
+  the planned size. Lighter sizes each OTOCO group's stop and TP to that group's filled amount; the executor checks the
+  stops cover exactly the position and logs ALERT_cover_mismatch if not (it never resizes orders on its own). An entry can
+  stop short with status `canceled-margin-not-allowed` when the leverage cap binds, so keep size below the margin cap.
+- TP1 HIT only when the TP1 reduce-only order itself shows `filled` in the order history. A position smaller than
+  planned is never treated as TP1 (that was a bug: a partial entry fill posted a false TP1 alert). Unexplained reductions
+  log ALERT_position_reduced_not_tp1.
 - Conflict rule: calls take priority over the autopilot. A BTC call is not placed while the autopilot holds a trade or a
   resting entry (ALERT); while a call is active the executor writes `calls/busy_<SYM>` and the autopilot opens nothing new
   and leaves that position alone.

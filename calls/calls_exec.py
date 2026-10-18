@@ -99,6 +99,47 @@ class Exec:
         except Exception as e:
             log("basis_failed", symbol=s, error=str(e)[:150]); return 0.0
 
+    def orders_detail(self, ex, which="inactive", limit=50):
+        """Read-only: our orders on this market with sizes, keyed by client_order_index.
+        which = "active" | "inactive" (filled / cancelled history). None if unavailable."""
+        try:
+            if ex._client is None and ex.active_orders() is None:
+                return None
+            lighter, _ = ex._sdk()
+            auth, err = ex._client.create_auth_token_with_expiry(600)
+            if err or not auth:
+                return None
+            api = lighter.OrderApi(ex._client.api_client)
+            if which == "active":
+                r = ex._run(api.account_active_orders(authorization=auth, account_index=CFG["account_index"], market_id=ex.meta.market_id))
+            else:
+                r = ex._run(api.account_inactive_orders(authorization=auth, account_index=CFG["account_index"], limit=limit,
+                                                        market_id=ex.meta.market_id))
+            return {o.client_order_index: dict(status=o.status, type=o.type, initial=float(o.initial_base_amount or 0),
+                                               remaining=float(o.remaining_base_amount or 0), filled=float(o.filled_base_amount or 0))
+                    for o in (r.orders or [])}
+        except Exception as e:
+            log("orders_detail_failed", which=which, error=X.redact(f"{type(e).__name__}: {e}")[:150]); return None
+
+    def sync_fill(self, c, pos, ev):
+        """Record the size that actually filled (partial entry fills included) and check the exchange stops/TPs cover
+        exactly that. Never changes orders: a mismatch is logged as an ALERT for a human."""
+        ex = self.ex[c["symbol"]]; dist = abs(c["entry"] - c["stop"])
+        c.setdefault("size_planned", c["size"])
+        hist = self.orders_detail(ex, "inactive") or {}; act = self.orders_detail(ex, "active") or {}
+        for g in c["groups"]:
+            e = hist.get(g["ids"]["entry"]) or act.get(g["ids"]["entry"])
+            if e: g["filled"] = e["filled"]; g["entry_status"] = e["status"]
+        eq = c.get("equity_at_open") or self.equity()
+        c.update(size=pos["size"], risk_usd=round(pos["size"] * dist, 4), risk_pct=round(pos["size"] * dist / eq * 100, 3),
+                 notional=round(pos["size"] * c["entry"], 2))
+        stops = sum(act[g["ids"]["stop"]]["remaining"] for g in c["groups"] if g["ids"]["stop"] in act)
+        tps = sum(act[g["ids"]["tp"]]["remaining"] for g in c["groups"] if g["ids"]["tp"] in act)
+        log(ev, id=c["id"], pos=pos, planned=c["size_planned"], filled=pos["size"], stop_cover=stops, tp_cover=tps,
+            groups=[{k: g.get(k) for k in ("size", "filled", "entry_status")} for g in c["groups"]])
+        if act and (abs(stops - pos["size"]) > 1e-9 or tps - pos["size"] > 1e-9):
+            log("ALERT_cover_mismatch", id=c["id"], pos=pos["size"], stop_cover=stops, tp_cover=tps)
+
     def autopilot_state(self):
         try: return json.loads((HOME / "state.json").read_text())
         except Exception: return {}
@@ -273,9 +314,11 @@ class Exec:
                 r = self.flatten(c, "STOP kill switch"); c["status"] = "killed"; log("killed", id=cid, result=r); continue
             if c["status"] == "placed":
                 if pos and pos["side"] == c["side"]:
-                    c.update(status="filled", fill_px=pos["entry"], fill_ts=now()); log("filled", id=cid, pos=pos)
+                    c.update(status="filled", fill_px=pos["entry"], fill_ts=now()); self.sync_fill(c, pos, "filled")
+                    part = (f" (partial: {pos['size']} of {c['size_planned']} planned)"
+                            if pos["size"] < c["size_planned"] - 1e-9 else "")
                     if not c["test"]:
-                        tg(f"<b>FILLED</b> {tag} on Lighter @ {pos['entry']:,}\nSize {pos['size']} · Stop {c['stop']:,} · "
+                        tg(f"<b>FILLED</b> {tag} on Lighter @ {pos['entry']:,}\nSize {pos['size']}{part} · Stop {c['stop']:,} · "
                            f"TP1 {c['tp1']:,} · TP2 {c['tp2']:,}\nRisk {c['risk_pct']}% of equity, stop is on the exchange")
                     continue
                 entries = [o for o in mine if o["kind"] == "entry"]
@@ -299,11 +342,23 @@ class Exec:
                     tg(f"<b>{why}</b> {tag} on Lighter\nPosition closed. Account P&amp;L since entry {pnl:+.2f} USD "
                        f"({pnl / c['risk_usd']:+.2f}R)" if c["risk_usd"] else f"<b>{why}</b> {tag}")
                 continue
-            if c["status"] == "filled" and len(c["groups"]) == 2 and pos["size"] < c["size"] * 0.75:
-                c["status"] = "tp1"; log("tp1_hit", id=cid, pos=pos)
-                if not c["test"]:
-                    tg(f"<b>TP1 HIT</b> {tag} on Lighter @ {c['tp1']:,}\nHalf closed, runner held to TP2 {c['tp2']:,}, "
-                       f"stop stays {c['stop']:,} (no break-even move)")
+            # entry still filling after the first fill: track the real size (never assume the planned size)
+            if c["status"] == "filled" and pos["size"] > c["size"] + 1e-9:
+                self.sync_fill(c, pos, "fill_grew")
+            # TP1 only when the TP1 reduce-only order itself shows as filled in the order history.
+            # A smaller-than-planned position (partial entry fill) is NOT a TP1 hit.
+            if c["status"] == "filled" and len(c["groups"]) == 2 and pos["size"] < c["size"] - 1e-9:
+                hist = self.orders_detail(ex, "inactive")
+                t1 = (hist or {}).get(c["groups"][0]["ids"]["tp"])
+                if t1 and t1["status"] == "filled" and t1["filled"] > 0:
+                    c.update(status="tp1", tp1_filled=t1["filled"], tp1_ts=now()); log("tp1_hit", id=cid, pos=pos, tp1_order=t1)
+                    c["size"] = pos["size"]
+                    if not c["test"]:
+                        tg(f"<b>TP1 HIT</b> {tag} on Lighter @ {c['tp1']:,}\nClosed {t1['filled']}, runner {pos['size']} held to "
+                           f"TP2 {c['tp2']:,}, stop stays {c['stop']:,} (no break-even move)")
+                elif hist is not None and c.get("reduced_seen") != pos["size"]:
+                    c["reduced_seen"] = pos["size"]
+                    log("ALERT_position_reduced_not_tp1", id=cid, pos=pos, recorded=c["size"], tp1_order=t1)
             # one position per market and it is ours: any reduce-only stop on the market protects it
             if orders is not None and not any(o["kind"] == "stop" for o in orders) and now() - c.get("fill_ts", 0) > 30:
                 sw = CFG["stop_worst_pct"] / 100; M = ex.meta
